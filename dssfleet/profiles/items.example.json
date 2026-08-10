@@ -1,0 +1,15 @@
+{
+  "default": {
+    "starting": ["item_tango", "item_branches", "item_branches", "item_circlet"],
+    "early": ["item_magic_wand", "item_boots", "item_wraith_band"],
+    "mid": ["item_power_treads", "item_falcon_blade"],
+    "late": ["item_black_king_bar", "item_desolator"]
+  },
+  "heroes": {
+    "npc_dota_hero_lion": {
+      "starting": ["item_tango", "item_clarity", "item_branches"],
+      "early": ["item_boots", "item_magic_wand"],
+      "mid": ["item_blink", "item_aether_lens"]
+    }
+  }
+}
