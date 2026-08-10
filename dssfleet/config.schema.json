@@ -1,0 +1,304 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/dsfleet/config.schema.json",
+  "title": "dsfleet unified configuration",
+  "type": "object",
+  "required": ["runtime_dir", "instances"],
+  "additionalProperties": false,
+  "properties": {
+    "runtime_dir": {
+      "type": "string",
+      "description": "Base directory for heartbeats, logs and persisted state. Env vars expanded."
+    },
+    "log_level": {
+      "type": "string",
+      "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+      "default": "INFO"
+    },
+
+    "defaults": {
+      "type": "object",
+      "description": "Applied to every instance; per-instance keys override these.",
+      "additionalProperties": false,
+      "properties": {
+        "cwd": { "type": "string" },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "startup_grace_s": { "type": "number", "minimum": 0, "default": 20.0 },
+        "shutdown_grace_s": { "type": "number", "minimum": 0, "default": 15.0 },
+        "health": { "$ref": "#/definitions/health" },
+        "restart": { "$ref": "#/definitions/restart" },
+        "isolation": { "$ref": "#/definitions/isolation" },
+        "log_max_bytes": { "type": "integer", "minimum": 0, "default": 33554432 },
+        "log_backups": { "type": "integer", "minimum": 0, "default": 3 }
+      }
+    },
+
+    "window_layout": {
+      "type": "object",
+      "description": "Deterministic grid placement of instance windows.",
+      "additionalProperties": false,
+      "required": ["backend"],
+      "properties": {
+        "backend": { "type": "string", "enum": ["auto", "win32", "x11", "noop"], "default": "auto" },
+        "enabled": { "type": "boolean", "default": true },
+        "origin": {
+          "type": "object",
+          "description": "Top-left of the layout region in virtual desktop coordinates.",
+          "additionalProperties": false,
+          "properties": { "x": { "type": "integer" }, "y": { "type": "integer" } },
+          "default": { "x": 0, "y": 0 }
+        },
+        "region": {
+          "type": "object",
+          "description": "Total width/height of the layout region.",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rows", "cols"],
+          "properties": {
+            "rows": { "type": "integer", "minimum": 1 },
+            "cols": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "gutter": { "type": "integer", "minimum": 0, "default": 0 },
+        "padding": { "type": "integer", "minimum": 0, "default": 0 },
+        "topmost": { "type": "boolean", "default": false },
+        "activate": { "type": "boolean", "default": false },
+        "strip_decorations": { "type": "boolean", "default": false },
+        "placement_retries": { "type": "integer", "minimum": 0, "default": 12 },
+        "placement_retry_delay_s": { "type": "number", "minimum": 0.05, "default": 1.0 },
+        "reapply_interval_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "0 disables periodic re-placement."
+        }
+      }
+    },
+
+    "metrics": {
+      "type": "object",
+      "description": "Fleet-level thresholds driving alerts and status colouring.",
+      "additionalProperties": false,
+      "properties": {
+        "min_healthy_ratio": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.8 },
+        "max_quarantined": { "type": "integer", "minimum": 0, "default": 1 },
+        "max_restarts_per_hour": { "type": "integer", "minimum": 0, "default": 12 },
+        "max_heartbeat_age_s": { "type": "number", "minimum": 0, "default": 30.0 },
+        "evaluate_interval_s": { "type": "number", "minimum": 1, "default": 15.0 },
+        "snapshot_persist_interval_s": { "type": "number", "minimum": 0, "default": 30.0 }
+      }
+    },
+
+    "telegram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "admin_ids"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "token": { "type": "string", "minLength": 1, "description": "Supports ${ENV_VAR} expansion." },
+        "admin_ids": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 1,
+          "description": "Telegram user IDs permitted to issue commands."
+        },
+        "alert_chat_ids": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Chats receiving unsolicited alerts. Defaults to admin_ids."
+        },
+        "alerts_enabled": { "type": "boolean", "default": true },
+        "alert_min_severity": {
+          "type": "string",
+          "enum": ["debug", "info", "warning", "error", "critical"],
+          "default": "warning"
+        },
+        "alert_coalesce_s": { "type": "number", "minimum": 0, "default": 5.0 },
+        "command_rate_limit_s": { "type": "number", "minimum": 0, "default": 0.7 },
+        "destructive_commands_require_confirm": { "type": "boolean", "default": true }
+      }
+    },
+
+    "affinity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "strategy": { "type": "string", "enum": ["physical_first", "sequential", "explicit", "none"], "default": "physical_first" },
+        "reserve_cpus": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "default": [0] },
+        "cpus_per_instance": { "type": "integer", "minimum": 1, "default": 1 },
+        "priority": { "type": "string", "enum": ["idle", "below_normal", "normal", "above_normal", "high"] },
+        "explicit": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "integer" } } }
+      }
+    },
+
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "block_on_fail": { "type": "boolean", "default": true },
+        "per_instance_mb": { "type": "integer", "minimum": 64, "default": 1100 },
+        "os_reserve_gb": { "type": "number", "minimum": 0, "default": 3.0 },
+        "warn_headroom_gb": { "type": "number", "minimum": 0, "default": 1.0 },
+        "min_pagefile_gb": { "type": "number", "minimum": 0, "default": 8.0 },
+        "min_disk_free_gb": { "type": "number", "minimum": 0, "default": 10.0 }
+      }
+    },
+
+    "instances": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/instance" }
+    }
+  },
+
+  "definitions": {
+    "instance": {
+      "type": "object",
+      "required": ["id", "executable"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+        "enabled": { "type": "boolean", "default": true },
+        "executable": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "cwd": { "type": "string" },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "grid_cell": {
+          "type": "object",
+          "description": "Explicit grid slot; omit for automatic row-major assignment.",
+          "additionalProperties": false,
+          "required": ["row", "col"],
+          "properties": {
+            "row": { "type": "integer", "minimum": 0 },
+            "col": { "type": "integer", "minimum": 0 },
+            "row_span": { "type": "integer", "minimum": 1, "default": 1 },
+            "col_span": { "type": "integer", "minimum": 1, "default": 1 }
+          }
+        },
+        "window_title_match": {
+          "type": "string",
+          "description": "Optional regex; disambiguates when a PID owns several top-level windows."
+        },
+        "startup_grace_s": { "type": "number", "minimum": 0 },
+        "shutdown_grace_s": { "type": "number", "minimum": 0 },
+        "log_max_bytes": { "type": "integer", "minimum": 0 },
+        "log_backups": { "type": "integer", "minimum": 0 },
+        "health": { "$ref": "#/definitions/health" },
+        "restart": { "$ref": "#/definitions/restart" },
+        "isolation": { "$ref": "#/definitions/isolation" },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "rcon_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "rcon_password": { "type": "string" },
+        "lane_role": { "type": "string", "enum": ["top", "mid", "bot", "support", "jungle"] }
+      }
+    },
+
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interval_s": { "type": "number", "minimum": 0.5, "default": 5.0 },
+        "failures_to_unhealthy": { "type": "integer", "minimum": 1, "default": 3 },
+        "heartbeat": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "path": { "type": "string", "description": "Defaults to <runtime_dir>/hb/<id>.json" },
+            "max_age_s": { "type": "number", "minimum": 1, "default": 30.0 },
+            "require_increasing_seq": { "type": "boolean", "default": true }
+          }
+        },
+        "window_responsive": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "timeout_ms": { "type": "integer", "minimum": 50, "default": 2000 },
+            "required": {
+              "type": "boolean",
+              "default": false,
+              "description": "If false, a missing window is tolerated (not yet mapped)."
+            }
+          }
+        },
+        "port": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "host": { "type": "string", "default": "127.0.0.1" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "protocol": { "type": "string", "enum": ["tcp", "udp_a2s"], "default": "tcp" },
+            "timeout_s": { "type": "number", "minimum": 0.1, "default": 3.0 }
+          }
+        }
+      }
+    },
+
+    "restart": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "backoff_initial_s": { "type": "number", "minimum": 0, "default": 3.0 },
+        "backoff_factor": { "type": "number", "minimum": 1.0, "default": 2.0 },
+        "backoff_max_s": { "type": "number", "minimum": 0, "default": 300.0 },
+        "backoff_jitter": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.2 },
+        "crash_window_s": { "type": "number", "minimum": 1, "default": 300.0 },
+        "crash_threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Restarts inside crash_window_s before QUARANTINED."
+        },
+        "healthy_reset_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 120.0,
+          "description": "Continuous healthy uptime that resets the backoff ladder."
+        }
+      }
+    },
+
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "env_separation", "runas", "container", "wrapper"] },
+        "home_template": {
+          "type": "string",
+          "description": "env_separation: per-instance HOME/USERPROFILE, e.g. D:/fleet/home/{id}"
+        },
+        "env_overrides": { "type": "object", "additionalProperties": { "type": "string" } },
+        "user": { "type": "string", "description": "runas: local account name" },
+        "domain": { "type": "string", "default": "." },
+        "password_env": { "type": "string", "description": "runas: env var holding the password" },
+        "container_image": { "type": "string" },
+        "container_runtime": { "type": "string", "enum": ["docker", "podman"], "default": "docker" },
+        "container_args": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "container_volumes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Docker -v specs, {id} expanded."
+        },
+        "wrapper_argv": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "wrapper: prefix argv; {id} expanded. Real argv is appended."
+        }
+      }
+    }
+  }
+}

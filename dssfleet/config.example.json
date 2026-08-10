@@ -1,0 +1,174 @@
+{
+  "runtime_dir": "D:/fleet/runtime",
+  "log_level": "INFO",
+
+  "defaults": {
+    "cwd": "D:/steamcmd/dota2ds/game",
+    "startup_grace_s": 45.0,
+    "shutdown_grace_s": 20.0,
+    "log_max_bytes": 33554432,
+    "log_backups": 3,
+    "env": {
+      "SDL_VIDEODRIVER": "windows"
+    },
+    "health": {
+      "interval_s": 5.0,
+      "failures_to_unhealthy": 3,
+      "heartbeat": {
+        "enabled": true,
+        "max_age_s": 30.0,
+        "require_increasing_seq": true
+      },
+      "window_responsive": {
+        "enabled": true,
+        "timeout_ms": 2000,
+        "required": false
+      },
+      "port": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "protocol": "udp_a2s",
+        "timeout_s": 3.0
+      }
+    },
+    "restart": {
+      "enabled": true,
+      "backoff_initial_s": 5.0,
+      "backoff_factor": 2.0,
+      "backoff_max_s": 300.0,
+      "backoff_jitter": 0.2,
+      "crash_window_s": 600.0,
+      "crash_threshold": 5,
+      "healthy_reset_s": 180.0
+    },
+    "isolation": {
+      "mode": "env_separation",
+      "home_template": "D:/fleet/home/{id}",
+      "env_overrides": {
+        "DSFLEET_INSTANCE": "{id}"
+      }
+    }
+  },
+
+  "window_layout": {
+    "backend": "auto",
+    "enabled": true,
+    "origin": { "x": 0, "y": 0 },
+    "region": { "width": 3840, "height": 2160 },
+    "grid": { "rows": 2, "cols": 3 },
+    "gutter": 4,
+    "padding": 8,
+    "topmost": false,
+    "activate": false,
+    "strip_decorations": false,
+    "placement_retries": 15,
+    "placement_retry_delay_s": 2.0,
+    "reapply_interval_s": 120.0
+  },
+
+  "metrics": {
+    "min_healthy_ratio": 0.8,
+    "max_quarantined": 1,
+    "max_restarts_per_hour": 12,
+    "max_heartbeat_age_s": 30.0,
+    "evaluate_interval_s": 15.0,
+    "snapshot_persist_interval_s": 30.0
+  },
+
+  "telegram": {
+    "enabled": true,
+    "token": "${DSFLEET_TG_TOKEN}",
+    "admin_ids": [111111111, 222222222],
+    "alert_chat_ids": [111111111],
+    "alerts_enabled": true,
+    "alert_min_severity": "warning",
+    "alert_coalesce_s": 5.0,
+    "command_rate_limit_s": 0.7,
+    "destructive_commands_require_confirm": true
+  },
+
+  "instances": [
+    {
+      "id": "srv-01",
+      "executable": "D:/steamcmd/dota2ds/game/bin/win64/dota2.exe",
+      "args": [
+        "-dedicated", "-console", "-usercon", "-insecure",
+        "+map", "dota", "+dota_force_gamemode", "23",
+        "+sv_cheats", "1", "+sv_lan", "1",
+        "+dota_bot_populate", "1",
+        "+port", "27015", "+tv_port", "27020",
+        "+hostname", "dsfleet-srv-01"
+      ],
+      "grid_cell": { "row": 0, "col": 0 },
+      "window_title_match": "dsfleet-srv-01|Dota 2 Dedicated",
+      "health": { "port": { "enabled": true, "port": 27015 } },
+      "tags": ["bots", "netload"]
+    },
+    {
+      "id": "srv-02",
+      "executable": "D:/steamcmd/dota2ds/game/bin/win64/dota2.exe",
+      "args": [
+        "-dedicated", "-console", "-usercon", "-insecure",
+        "+map", "dota", "+dota_force_gamemode", "23",
+        "+sv_cheats", "1", "+sv_lan", "1",
+        "+dota_bot_populate", "1",
+        "+port", "27025", "+tv_port", "27030",
+        "+hostname", "dsfleet-srv-02"
+      ],
+      "grid_cell": { "row": 0, "col": 1 },
+      "health": { "port": { "enabled": true, "port": 27025 } },
+      "tags": ["bots", "netload"]
+    },
+    {
+      "id": "srv-03",
+      "executable": "D:/steamcmd/dota2ds/game/bin/win64/dota2.exe",
+      "args": [
+        "-dedicated", "-console", "-usercon", "-insecure",
+        "+map", "dota", "+sv_lan", "1",
+        "+port", "27035", "+hostname", "dsfleet-srv-03"
+      ],
+      "grid_cell": { "row": 0, "col": 2 },
+      "health": { "port": { "enabled": true, "port": 27035 } },
+      "tags": ["bots"]
+    },
+    {
+      "id": "load-01",
+      "executable": "D:/fleet/tools/netload_client.exe",
+      "args": ["--connect", "127.0.0.1:27015", "--clients", "9", "--tickrate", "30"],
+      "grid_cell": { "row": 1, "col": 0 },
+      "health": {
+        "heartbeat": { "enabled": true, "max_age_s": 15.0 },
+        "window_responsive": { "enabled": false },
+        "port": { "enabled": false }
+      },
+      "tags": ["loadgen"]
+    },
+    {
+      "id": "load-02",
+      "executable": "D:/fleet/tools/netload_client.exe",
+      "args": ["--connect", "127.0.0.1:27025", "--clients", "9", "--tickrate", "30"],
+      "grid_cell": { "row": 1, "col": 1 },
+      "health": {
+        "heartbeat": { "enabled": true, "max_age_s": 15.0 },
+        "window_responsive": { "enabled": false },
+        "port": { "enabled": false }
+      },
+      "tags": ["loadgen"]
+    },
+    {
+      "id": "collector",
+      "executable": "python",
+      "args": ["D:/fleet/tools/telemetry_collector.py", "--targets", "27015,27025,27035"],
+      "grid_cell": { "row": 1, "col": 2 },
+      "isolation": { "mode": "none" },
+      "health": {
+        "interval_s": 10.0,
+        "heartbeat": { "enabled": true, "max_age_s": 45.0 },
+        "window_responsive": { "enabled": false },
+        "port": { "enabled": false }
+      },
+      "restart": { "crash_threshold": 8 },
+      "tags": ["metrics"]
+    }
+  ]
+}
